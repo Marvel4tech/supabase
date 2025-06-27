@@ -6,10 +6,10 @@ import { supabase } from "./lib/supabaseClient";
 export default function Home() {
   const [newTask, setNewTask] = useState({title: "", description: ""});
   const [tasks, setTasks] = useState([]);
+  const [newDescription, setNewDescription] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
     const { error } = await supabase.from('tasks').insert(newTask).single();
 
     if (error) {
@@ -34,6 +34,24 @@ export default function Home() {
   useEffect(() => {
     fetchTasks();
   }, [])
+
+  const handleDelete = async (id) => {
+    const { error } = await supabase.from('tasks').delete().eq("id", id)
+
+    if (error) {
+      console.error("Error deleting Task", error.message);
+      return;
+    }
+  }
+
+  const handleUpdate = async (id) => {
+    const { error } = await supabase.from('tasks').update({description: newDescription}).eq("id", id)
+
+    if (error) {
+      console.error("Error updating Task", error.message);
+      return;
+    }
+  }
 
   return (
     <div className=" max-w-2xl h-svh m-auto flex flex-col items-center space-y-5 py-8">
@@ -68,21 +86,29 @@ export default function Home() {
       <ul className=" w-full mt-5">
         {
           tasks.map((task) => (
-            <li key={task.id}>
-              <div className=" border-1 border-white rounded-xs p-4 flex flex-col items-center space-y-4">
+            <li key={task.id} className=" mb-2">
+              <div className=" border-1 border-gray-500 rounded-xs p-4 flex flex-col items-center space-y-4">
                 <h2 className=" font-bold">
                   {task.title}
                 </h2>
-                <p className=" text-gray-200">
+                <p className=" text-gray-300 text-sm">
                   {task.description}
                 </p>
-                <div className=" space-x-2">
-                  <button className=" text-sm bg-blue-950 py-1 px-2 rounded-sm hover:bg-amber-300 hover:text-black">
-                    Edit
-                  </button>
-                  <button className=" text-sm bg-blue-950 py-1 px-2 rounded-sm hover:bg-red-300 hover:text-black">
-                    Delete
-                  </button>
+                <div className=" flex flex-col items-center space-y-2 text-xs">
+                  <textarea 
+                    placeholder="Update description"
+                    className=" border-1 border-gray-200 rounded-sm p-2 outline-0"
+                    onChange={(e) => setNewDescription(e.target.value)}
+                  />
+                  <div className=" space-x-2">
+                    <button onClick={() => handleUpdate(task.id)} className=" text-sm bg-blue-950 py-1 px-2 rounded-sm 
+                    hover:bg-amber-300 hover:text-black">
+                      Edit
+                    </button>
+                    <button onClick={() => handleDelete(task.id)} className=" text-sm bg-blue-950 py-1 px-2 rounded-sm hover:bg-red-300 hover:text-black">
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             </li>
