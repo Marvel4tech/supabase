@@ -7,11 +7,40 @@ const TaskManager = ({session}) => {
     const [newTask, setNewTask] = useState({title: "", description: ""});
     const [tasks, setTasks] = useState([]);
     const [newDescription, setNewDescription] = useState("");
+    const [taskImage, setTaskImage] = useState(null)
+
+    // for image
+    const handleFileChange = (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        setTaskImage(e.target.files[0])
+      }
+    }
+
+    // file image
+    const uploadImage = async (file) => {
+      const filePath = `${file.name}-${Date.now()}`
+
+      const { error } = await supabase.storage.from("tasks-images").upload(filePath, file);
+
+      if (error) {
+        console.log("Error uploading Image: ", error.message);
+        return;
+      }
+
+      const { data } = await supabase.storage.from("tasks-images").getPublicUrl(filePath);
+      return data.publicUrl;
+    }
 
     // Submit or add Task
     const handleSubmit = async (e) => {
         e.preventDefault()
-        const { error } = await supabase.from('tasks').insert({...newTask, email: session.user.email}).single();
+
+        let imageUrl; // for image
+        if (taskImage) {
+          imageUrl = await uploadImage(taskImage);
+        }
+
+        const { error } = await supabase.from('tasks').insert({...newTask, email: session.user.email, image_url: imageUrl}).single();
 
         if (error) {
             console.error("Error adding Task", error.message);
@@ -95,8 +124,7 @@ const TaskManager = ({session}) => {
         supabase.removeChannel(channel);
       };
     }, []);
-    
-    
+
   return (
     <div className="flex flex-col items-center space-y-5 py-8">
       <h2 className=" font-bold text-2xl">
@@ -122,6 +150,14 @@ const TaskManager = ({session}) => {
           }
           className=" w-full border-1 rounded-xs bg-gray-900 outline-0 py-1 px-4"
         />
+
+        <input 
+          accept="image/*"
+          type="file"
+          onChange={handleFileChange}
+          className=" border-1 border-gray-300 mt-2 py-1 px-4 rounded-sm"
+        />
+
         <button type="submit" className=" text-sm mt-4 bg-blue-950 py-1 px-2 rounded-sm hover:bg-green-300 hover:text-black">
           Add Task
         </button>
@@ -138,6 +174,11 @@ const TaskManager = ({session}) => {
                 <p className=" text-gray-300 text-sm">
                   {task.description}
                 </p>
+                <img 
+                  src={task.image_url} 
+                  alt="image title" 
+                  className=" h-48 w-72"
+                />
                 <div className=" flex flex-col items-center space-y-2 text-xs">
                   <textarea 
                     placeholder="Update description"
