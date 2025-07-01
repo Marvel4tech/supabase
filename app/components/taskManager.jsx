@@ -3,14 +3,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const TaskManager = () => {
+const TaskManager = ({session}) => {
     const [newTask, setNewTask] = useState({title: "", description: ""});
     const [tasks, setTasks] = useState([]);
     const [newDescription, setNewDescription] = useState("");
 
+    // Submit or add Task
     const handleSubmit = async (e) => {
         e.preventDefault()
-        const { error } = await supabase.from('tasks').insert(newTask).single();
+        const { error } = await supabase.from('tasks').insert({...newTask, email: session.user.email}).single();
 
         if (error) {
             console.error("Error adding Task", error.message);
@@ -20,6 +21,7 @@ const TaskManager = () => {
         setNewTask({title: "", description: ""});
     }
 
+    // Get all tasks
     const fetchTasks = async () => {
         const {error, data} = await supabase.from("tasks").select('*').order("created_at", {ascending: false})
 
@@ -35,6 +37,7 @@ const TaskManager = () => {
         fetchTasks();
     }, [])
 
+    // Delete Tasks
     const handleDelete = async (id) => {
         const { error } = await supabase.from('tasks').delete().eq("id", id)
 
@@ -42,8 +45,12 @@ const TaskManager = () => {
             console.error("Error deleting Task", error.message);
             return;
         }
+
+        // Remove from state
+        setTasks((prev) => prev.filter((task) => task.id !== id));
     }
 
+    // Edit or Update Tasks
     const handleUpdate = async (id) => {
         const { error } = await supabase.from('tasks').update({description: newDescription}).eq("id", id)
 
@@ -51,8 +58,45 @@ const TaskManager = () => {
             console.error("Error updating Task", error.message);
             return;
         }
+
+        // Update in state
+        setTasks((prev) =>
+          prev.map((task) =>
+            task.id === id ? { ...task, description: newDescription } : task
+          )
+        );
+        setNewDescription(""); // Clear textarea after update
     }
 
+    // Subscribe On so it updates live at once
+    useEffect(() => {
+      const channel = supabase
+        .channel("tasks-channel")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "tasks" },
+          (payload) => {
+            const newTask = payload.new;
+            setTasks((prev) => [...prev, newTask]);
+          }
+        );
+    
+      // Subscribe
+      const { subscription, error } = channel.subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
+    
+      if (error) {
+        console.error("Subscription error:", error.message);
+      }
+    
+      // Cleanup
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, []);
+    
+    
   return (
     <div className="flex flex-col items-center space-y-5 py-8">
       <h2 className=" font-bold text-2xl">

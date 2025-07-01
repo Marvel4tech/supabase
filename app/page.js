@@ -9,6 +9,7 @@ import { supabase } from "./lib/supabaseClient";
 export default function Home() {
   const [session, setSession] = useState(null);
 
+  // LogIn and LogOut 
   const fetchSession = async () => {
     const currentSession = await supabase.auth.getSession();
     console.log(currentSession)
@@ -40,7 +41,7 @@ export default function Home() {
         session ? 
           (<>
             <button onClick={handleLogout} className=" hover:bg-gray-800 border-1 rounded-sm py-1 px-4 mt-8">Log Out</button>
-            <TaskManager /> 
+            <TaskManager session={session} /> 
           </>) :
           (<Auth />)
       }
