@@ -18,7 +18,9 @@ const TaskManager = ({session}) => {
 
     // file image
     const uploadImage = async (file) => {
-      const filePath = `${file.name}-${Date.now()}`
+      const cleanName = file.name.replace(/\s+/g, "_");
+      const filePath = `${session.user.email}/${cleanName}-${Date.now()}`;
+      console.log("Uploading filePath:", filePath);
 
       const { error } = await supabase.storage.from("tasks-images").upload(filePath, file);
 
@@ -28,7 +30,7 @@ const TaskManager = ({session}) => {
       }
 
       const { data } = await supabase.storage.from("tasks-images").getPublicUrl(filePath);
-      return data.publicUrl;
+      return { publicUrl: data.publicUrl, filePath };
     }
 
     // Submit or add Task
@@ -36,11 +38,14 @@ const TaskManager = ({session}) => {
         e.preventDefault()
 
         let imageUrl; // for image
+        let imagePath;
         if (taskImage) {
-          imageUrl = await uploadImage(taskImage);
+          const { publicUrl, filePath } = await uploadImage(taskImage);
+          imageUrl = publicUrl;
+          imagePath = filePath;
         }
 
-        const { error } = await supabase.from('tasks').insert({...newTask, email: session.user.email, image_url: imageUrl}).single();
+        const { error } = await supabase.from('tasks').insert({...newTask, email: session.user.email, image_url: imageUrl, image_path: imagePath}).single();
 
         if (error) {
             console.error("Error adding Task", error.message);
@@ -52,7 +57,8 @@ const TaskManager = ({session}) => {
 
     // Get all tasks
     const fetchTasks = async () => {
-        const {error, data} = await supabase.from("tasks").select('*').order("created_at", {ascending: false})
+        // const {error, data} = await supabase.from("tasks").select('*').order("created_at", {ascending: false}) -> fetches all task
+        const { error, data } = await supabase.from("tasks").select("*").eq("email", session.user.email).order("created_at", { ascending: false }); //fetch data based on user email
 
         if (error) {
             console.error("Error fetching Tasks", error.message);
@@ -66,18 +72,50 @@ const TaskManager = ({session}) => {
         fetchTasks();
     }, [])
 
-    // Delete Tasks
     const handleDelete = async (id) => {
-        const { error } = await supabase.from('tasks').delete().eq("id", id)
-
-        if (error) {
-            console.error("Error deleting Task", error.message);
-            return;
+      // 1. Fetch the task to get image_path
+      const { data: taskData, error: fetchError } = await supabase
+        .from("tasks")
+        .select("image_path")
+        .eq("id", id)
+        .single();
+    
+      if (fetchError) {
+        console.error("Error fetching task:", fetchError.message);
+        return;
+      }
+    
+      if (taskData?.image_path) {
+        console.log("Attempting to delete image path (exact):", taskData.image_path);
+    
+        const { error: storageError } = await supabase
+          .storage
+          .from("tasks-images")
+          .remove([taskData.image_path]);
+    
+        if (storageError) {
+          console.error("Storage deletion failed:", storageError.message);
+          return;
+        } else {
+          console.log("Image deleted successfully.");
         }
-
-        // Remove from state
-        setTasks((prev) => prev.filter((task) => task.id !== id));
-    }
+      }
+    
+      // Delete the TASK RECORD
+      const { error: deleteError } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", id);
+    
+      if (deleteError) {
+        console.error("Task deletion failed:", deleteError.message);
+        return;
+      }
+      
+      // Update UI
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    };
+    
 
     // Edit or Update Tasks
     const handleUpdate = async (id) => {
@@ -205,3 +243,31 @@ const TaskManager = ({session}) => {
 }
 
 export default TaskManager
+
+
+   // Delete Tasks
+    /* const handleDelete = async (id) => {
+
+      // Get the task so we can get the image_url
+      const { data: taskData, error: fetchError } = await supabase.from("tasks").select("image_path").eq("id", id).single();
+
+      if (fetchError) {
+        console.error("Error deleting Task", fetchError.message);
+        return;
+    }
+
+      // Delete the task
+      const { error: deleteError } = await supabase.from('tasks').delete().eq("id", id)
+
+      // Delete from bucket
+      if (taskData?.image_path) {
+          const { error: storageError } = await supabase.storage.from("tasks-images").remove([taskData.image_path]);
+
+          if (storageError) {
+            console.error("Error deleting image from storage", storageError.message);
+          }
+      }
+
+      // Remove from state
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    } */
