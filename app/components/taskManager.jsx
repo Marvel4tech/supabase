@@ -136,32 +136,36 @@ const TaskManager = ({session}) => {
     }
 
     // Subscribe On so it updates live at once
-    useEffect(() => {
-      const channel = supabase
-        .channel("tasks-channel")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "tasks" },
-          (payload) => {
-            const newTask = payload.new;
-            setTasks((prev) => [...prev, newTask]);
-          }
-        );
-    
-      // Subscribe
-      const { subscription, error } = channel.subscribe((status) => {
-        console.log("Subscription status:", status);
-      });
-    
-      if (error) {
-        console.error("Subscription error:", error.message);
-      }
-    
-      // Cleanup
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }, []);
+  useEffect(() => {
+    const channel = supabase
+      .channel('tasks-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'tasks',
+        },
+        (payload) => {
+          const newTask = payload.new;
+          setTasks((prev) => [...prev, newTask]);
+        }
+      );
+
+  // Subscribe and log status
+  channel.subscribe((status) => {
+    console.log('Subscription status:', status);
+    if (status === 'SUBSCRIBED') {
+      console.log('Successfully subscribed to Realtime!');
+    }
+  });
+
+  // Cleanup on unmount
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
 
   return (
     <div className="flex flex-col items-center space-y-5 py-8">

@@ -39,14 +39,14 @@ const Auth = () => {
             <input 
                 type="email"
                 placeholder='Email'
-                value={"email"}
+                value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className=' border-1 border-gray-500 rounded-sm py-1.5 px-4 w-3/4'
             />
             <input 
                 type="password"
                 placeholder='Password'
-                value={"password"}
+                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className=' border-1 border-gray-500 rounded-sm py-1.5 px-4 w-3/4'
             />
